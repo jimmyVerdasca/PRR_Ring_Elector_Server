@@ -5,8 +5,8 @@ package com.mycompany.ring_elector_server;
  * @author jimmy
  */
 public class Message {
-    byte[] message;
-    int length;
+    private byte[] message;
+    private int length;
     
     /**
      * Constructeur pour construire un message de type RESPONSE
@@ -25,7 +25,7 @@ public class Message {
      * @param candidats liste des identifiant des candidats déjà validés 
      */
     public Message(byte[] candidats) {
-        length = message.length + 1;
+        length = candidats.length + 1;
         message = new byte[length];
         message[0] = MessageType.ELECTION.value;
         for (int i = 0; i < candidats.length; i++) {
@@ -51,8 +51,6 @@ public class Message {
     public int getLength() {
         return length;
     }
-    
-    
     
     MessageType getMessageType() {
         return MessageType.get(message[0]);

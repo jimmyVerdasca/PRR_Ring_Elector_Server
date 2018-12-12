@@ -1,11 +1,14 @@
 package com.mycompany.ring_elector_server;
 
 import java.io.BufferedReader;
+import java.io.IOException;
 import java.io.InputStreamReader;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
+import java.net.Inet4Address;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
+import java.net.ProtocolException;
 import java.net.SocketException;
 import java.net.SocketTimeoutException;
 import java.net.UnknownHostException;
@@ -36,6 +39,7 @@ public class RingElectorServer {
     private final ServerDAO mySelf;
     private ServerDAO nextServerAvailable;
     private final ServerDAO[] servers;
+    private final int MAX_NB_SERVER = 4;
 
     public RingElectorServer(ServerDAO ownServer, ServerDAO[] servers) {
         this.mySelf = ownServer;
@@ -123,12 +127,70 @@ public class RingElectorServer {
         }
     }
     
-    public void sendMessage() {
-        
+    /**
+     * Envoie un Message au ServerDAO destinateur.
+     * 
+     * @param message à envoyer
+     * @param destServer server à qui l'on souhaite envoyer le message
+     * @throws SocketException en cas de problème lors de la création de la socket
+     * @throws IOException en cas de soucis lors de l'envoie du paquet
+     */
+    private void sendMessage(Message message, ServerDAO destServer) throws SocketException, IOException {
+        DatagramSocket udpSocket = new DatagramSocket();
+        DatagramPacket datagram = new DatagramPacket(message.getMessage(), message.getLength(), destServer.getIpAdress(), destServer.getPort());
+        udpSocket.send(datagram);
     }
     
-    public void receiveMessage() {
+    /**
+     * attend de recevoir un Message
+     * 
+     * @return
+     * @throws SocketException
+     * @throws IOException 
+     */
+    private Message receiveMessage() throws SocketException, IOException {
+        DatagramSocket socket = new DatagramSocket(mySelf.getPort());
+        byte[] buffer = new byte[1 + MAX_NB_SERVER];
+        DatagramPacket packet = new DatagramPacket(buffer, buffer.length);
+        socket.receive(packet);
         
+        Message message = null;
+        if (buffer[0] == MessageType.RESPONSE.value) {
+            message = new Message();
+        } else if (buffer[0] == MessageType.RESULT.value) {
+            message = new Message(buffer[1]);
+        } else if (buffer[0] == MessageType.ELECTION.value) {
+            int sizeListCandidats = packet.getLength() - 1;
+            byte[] candidats = new byte[sizeListCandidats];
+            for (int i = 0; i < sizeListCandidats; i++) {
+                candidats[i] = buffer[i + 1];
+            }
+            message = new Message(candidats);
+        } else {
+            throw new ProtocolException("Le type de message ne correspond à rien de connu : " + buffer[0]);
+        }
+        return message;
     }
+    
+    public static void main (String[] args) throws UnknownHostException, IOException{
+        ServerDAO senderDAO = new ServerDAO(InetAddress.getByName("127.0.0.1"), 1099);
+        ServerDAO receiverDAO = new ServerDAO(InetAddress.getByName("127.0.0.1"), 1100);
+        ServerDAO[] servers = {senderDAO, receiverDAO};
+        RingElectorServer serverSender = new RingElectorServer(senderDAO, servers);
+        byte[] candidats = new byte[1];
+        candidats[0] = 3;
+        serverSender.sendMessage(new Message(candidats), receiverDAO);
+    }
+    /*
+    public static void main (String[] args) throws UnknownHostException, InterruptedException, IOException{
+        ServerDAO senderDAO = new ServerDAO(InetAddress.getByName("127.0.0.1"), 1099);
+        ServerDAO receiverDAO = new ServerDAO(InetAddress.getByName("127.0.0.1"), 1100);
+        ServerDAO[] servers = {senderDAO, receiverDAO};
+        RingElectorServer receiverServer = new RingElectorServer(receiverDAO, servers);
+        Thread.sleep(1000 * 10);
+        Message message = receiverServer.receiveMessage();
+        System.out.println(message.getMessageType().name());
+        
+    }*/
     
 }
