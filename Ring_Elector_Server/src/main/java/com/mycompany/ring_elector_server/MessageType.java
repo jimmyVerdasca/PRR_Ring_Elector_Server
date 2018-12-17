@@ -6,7 +6,7 @@ import java.util.Map;
 
 /**
  *
- * @author jimmy
+ * @author Jimmy Verdasca et Nathan Gonzales
  */
 public enum MessageType {
     ELECTION ((byte)0),

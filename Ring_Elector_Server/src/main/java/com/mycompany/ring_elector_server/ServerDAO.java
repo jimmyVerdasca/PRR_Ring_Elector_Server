@@ -1,8 +1,3 @@
-/*
- * To change this license header, choose License Headers in Project Properties.
- * To change this template file, choose Tools | Templates
- * and open the template in the editor.
- */
 package com.mycompany.ring_elector_server;
 
 import java.net.InetAddress;
@@ -15,10 +10,12 @@ import java.net.InetAddress;
 public class ServerDAO {
     private final InetAddress ipAdress;
     private final int port;
+    private final int id;
     
-    public ServerDAO(InetAddress ipAdress, int port) {
+    public ServerDAO(InetAddress ipAdress, int port, int id) {
         this.ipAdress = ipAdress;
-        this.port = port;    
+        this.port = port; 
+        this.id = id;
     }
 
     public InetAddress getIpAdress() {
@@ -29,14 +26,25 @@ public class ServerDAO {
         return port;
     }
     
-    public int getAptitude() {
-        return ipAdress.getAddress()[3] + port;
+    public byte getAptitude() {
+        /* 
+         * On se permet un cast avec perte d'information car
+         * en cas d'égalité l'algorithme départagera avec l'adresse ip
+         */
+        return (byte)(ipAdress.getAddress()[3] + port);
     }
+
+    public int getId() {
+        return id;
+    }
+    
+    
     
     @Override
     public int hashCode() {
         int hash = 31;
         int result = hash * port;
+        result += hash * id;
         result += hash * ipAdress.hashCode();
         return result;
     }
@@ -45,6 +53,7 @@ public class ServerDAO {
     public boolean equals(Object obj) {
         return getClass().isInstance(obj) &&
             ipAdress == ((ServerDAO)obj).ipAdress &&
+            id == ((ServerDAO)obj).id &&
             port == ((ServerDAO)obj).port;
     }
 }

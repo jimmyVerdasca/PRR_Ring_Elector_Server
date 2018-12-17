@@ -40,138 +40,43 @@ public class RingElectorServer {
     private ServerDAO nextServerAvailable;
     private final ServerDAO[] servers;
     private final int MAX_NB_SERVER = 4;
+    private final Thread electionManager;
 
-    public RingElectorServer(ServerDAO ownServer, ServerDAO[] servers) {
+    public RingElectorServer(ServerDAO ownServer, ServerDAO[] servers) throws SocketException {
         this.mySelf = ownServer;
         this.servers = servers;
-        
-        
+        this.electionManager = new Thread(new ElectionManager(ownServer, servers));
     }
     
-    private int findIndexOf(ServerDAO server) {
-        for (int index = 0; index < servers.length; index++) {
-            if(server.equals(servers[index])) {
-                return index;
-            }
-        }
-        return -1;
-    }
-    
-    private void updateNextServer() {
-        int myIndex = findIndexOf(mySelf);
-        
-        if(myIndex == -1){
-            throw new RuntimeException("ownServer not contained in servers list");
-        } else {
-            nextServerAvailable = servers[(myIndex + 1) % servers.length];
-        }
-    }
-
-    public void initialize() {
-        updateNextServer();
-    }
-    
+    /**
+    * 3 types de messages sont possibles :
+    * 
+    * ELECTION + liste des candidats
+    * lorsqu'un nouveau serveur est disponible on fait un tour
+    * des serveurs pour savoir qui est disponible et qui devrait être l'élu.
+    * 
+    * RESPONSE
+    * Lorsqu'un serveur reçoit un message que ce soit ELECTION ou RESULT,
+    * Il répond par un RESPONSE sans paramètres après avoir transmis
+    * le message plus loin dans la chaine.
+    * Uniquement pour que le serveur le précédent dans l'anneau,
+    * sache que le message à bien été transmit.
+    * 
+    * RESULT + élu final
+    * lorsque le message ELECTION parvient jusqu'à un serveur qui se considère comme élu
+    * pour se considérer comme élu :
+    * 1) il doit se trouver dans la liste
+    * 2) il doit avoir le plus grande aptitude
+    * 3) en cas d'égalité avoir la plus petite adress IP
+    * Lorsque le message RESULT revient à l'élu, alors l'élection est
+    * terminé et l'unicité et la sélectivité sont respectés.
+    */
     public void startElection() {
-        // envoyer au suivant soit-même ou meilleur élu que soit
-        DatagramSocket udpSocket = null;
-
-        try {
-            udpSocket = new DatagramSocket();
-            udpSocket.bind(new InetSocketAddress(nextServerAvailable.getPort()));
-
-            InetAddress ipAddress = nextServerAvailable.getIpAdress();
-            /**
-             * 3 types de messages sont possibles :
-             * 
-             * ELECTION + liste des candidats
-             * lorsqu'un nouveau serveur est disponible on fait un tour
-             * des serveurs pour savoir qui est disponible et qui devrait être l'élu.
-             * 
-             * RESPONSE
-             * Lorsqu'un serveur reçoit un message que ce soit ELECTION ou RESULT,
-             * Il répond par un RESPONSE sans paramètres après avoir transmis
-             * le message plus loin dans la chaine.
-             * Uniquement pour que le serveur le précédent dans l'anneau,
-             * sache que le message à bien été transmit.
-             * 
-             * RESULT + élu final
-             * lorsque le message ELECTION parvient jusqu'à un serveur qui se considère comme élu
-             * pour se considérer comme élu :
-             * 1) il doit se trouver dans la liste
-             * 2) il doit avoir le plus grande aptitude
-             * 3) en cas d'égalité avoir la plus petite adress IP
-             * Lorsque le message RESULT revient à l'élu, alors l'élection est
-             * terminé et l'unicité et la sélectivité sont respectés.
-             */
-            //DatagramPacket udpSendPacket = new DatagramPacket(sendMessage, sendMessage.length, ipAddress, SEND_PORT);
-
-            // udp send
-            //udpSocket.send(udpSendPacket);
-
-
-            // udp receive
-            byte[] receiveMessage = new byte[100];
-            DatagramPacket udpReceivePacket = new DatagramPacket(receiveMessage, receiveMessage.length);
-
-            long startTime = System.currentTimeMillis();
-            while ((System.currentTimeMillis() - startTime) < 5000) {
-                udpSocket.receive(udpReceivePacket);
-            }
-            udpSocket.close();
-        } catch (Exception e) {
-            e.printStackTrace();
-        } finally {
-            if (udpSocket != null) {
-                udpSocket.close();
-            }
-        }
+        electionManager.start();
     }
     
-    /**
-     * Envoie un Message au ServerDAO destinateur.
-     * 
-     * @param message à envoyer
-     * @param destServer server à qui l'on souhaite envoyer le message
-     * @throws SocketException en cas de problème lors de la création de la socket
-     * @throws IOException en cas de soucis lors de l'envoie du paquet
-     */
-    private void sendMessage(Message message, ServerDAO destServer) throws SocketException, IOException {
-        DatagramSocket udpSocket = new DatagramSocket();
-        DatagramPacket datagram = new DatagramPacket(message.getMessage(), message.getLength(), destServer.getIpAdress(), destServer.getPort());
-        udpSocket.send(datagram);
-    }
     
-    /**
-     * attend de recevoir un Message
-     * 
-     * @return
-     * @throws SocketException
-     * @throws IOException 
-     */
-    private Message receiveMessage() throws SocketException, IOException {
-        DatagramSocket socket = new DatagramSocket(mySelf.getPort());
-        byte[] buffer = new byte[1 + MAX_NB_SERVER];
-        DatagramPacket packet = new DatagramPacket(buffer, buffer.length);
-        socket.receive(packet);
-        
-        Message message = null;
-        if (buffer[0] == MessageType.RESPONSE.value) {
-            message = new Message();
-        } else if (buffer[0] == MessageType.RESULT.value) {
-            message = new Message(buffer[1]);
-        } else if (buffer[0] == MessageType.ELECTION.value) {
-            int sizeListCandidats = packet.getLength() - 1;
-            byte[] candidats = new byte[sizeListCandidats];
-            for (int i = 0; i < sizeListCandidats; i++) {
-                candidats[i] = buffer[i + 1];
-            }
-            message = new Message(candidats);
-        } else {
-            throw new ProtocolException("Le type de message ne correspond à rien de connu : " + buffer[0]);
-        }
-        return message;
-    }
-    
+    /*
     public static void main (String[] args) throws UnknownHostException, IOException{
         ServerDAO senderDAO = new ServerDAO(InetAddress.getByName("127.0.0.1"), 1099);
         ServerDAO receiverDAO = new ServerDAO(InetAddress.getByName("127.0.0.1"), 1100);
@@ -180,7 +85,7 @@ public class RingElectorServer {
         byte[] candidats = new byte[1];
         candidats[0] = 3;
         serverSender.sendMessage(new Message(candidats), receiverDAO);
-    }
+    }*/
     /*
     public static void main (String[] args) throws UnknownHostException, InterruptedException, IOException{
         ServerDAO senderDAO = new ServerDAO(InetAddress.getByName("127.0.0.1"), 1099);
