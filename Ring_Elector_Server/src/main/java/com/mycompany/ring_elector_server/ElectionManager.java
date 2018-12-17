@@ -66,27 +66,30 @@ public class ElectionManager implements Runnable {
     public void run() {
         while (running) {
             try {
-                Message message = receiveMessage(0);
-                switch (message.getMessageType()) {
-                    case ELECTION:
-                        List<ServerDAO> candidats = new ArrayList<>();
-                        byte[] byteMessage = message.getMessage();
-                        for (int i = 0; i < message.getLength(); i++) {
-                            candidats.add(servers[byteMessage[i + 1]]);
-                        }
-                        electionReceived(candidats);
-                        break;
-                    case RESPONSE:
-                        throw new ProtocolException("Received a RESPONSE without sending any ELECTION or RESULT");
-                    case RESULT:
-                        ServerDAO elected = servers[message.getMessage()[1]];
-                        resultReceived(elected);
-                        break;
-                }
+                processMessage(receiveMessage(0));
             } catch (IOException ex) {
                 System.out.println(ex);
             }
             
+        }
+    }
+    
+    private void processMessage(Message message) throws ProtocolException {
+        switch (message.getMessageType()) {
+            case ELECTION:
+                List<ServerDAO> candidats = new ArrayList<>();
+                byte[] byteMessage = message.getMessage();
+                for (int i = 0; i < message.getLength(); i++) {
+                    candidats.add(servers[byteMessage[i + 1]]);
+                }
+                electionReceived(candidats);
+                break;
+            case RESPONSE:
+                throw new ProtocolException("Received a RESPONSE without sending any ELECTION or RESULT");
+            case RESULT:
+                ServerDAO elected = servers[message.getMessage()[1]];
+                resultReceived(elected);
+                break;
         }
     }
     
@@ -142,16 +145,62 @@ public class ElectionManager implements Runnable {
     }
     
     /**
-     * Envoie un Message au ServerDAO destinateur.
+     * Envoie un Message au ServerDAO destinateur. Si le boolean d'aquitement est activé,
+     * on attend de lire un message de type RESPONSE avant de sortir de la méthode.
+     * 
+     * Si aucune RESPONSE n'est délivré après TIME_OUT milliseconds,
+     * on cherche le serveur suivant dans la liste et on retente d'envoyer.
      * 
      * @param message à envoyer
      * @param destServer server à qui l'on souhaite envoyer le message
      * @throws SocketException en cas de problème lors de la création de la socket
      * @throws IOException en cas de soucis lors de l'envoie du paquet
      */
-    private void sendMessage(Message message, ServerDAO destServer) throws SocketException, IOException {
+    private void sendMessage(Message message, ServerDAO destServer, boolean aquitmentRequired) throws SocketException, IOException {
+        List<Message> messageStock = new ArrayList<>();
         DatagramPacket datagram = new DatagramPacket(message.getMessage(), message.getLength(), destServer.getIpAdress(), destServer.getPort());
-        socket.send(datagram);
+        if (aquitmentRequired) {
+            boolean aquitmentReceived = false;
+            while (!aquitmentReceived) {
+                socket.send(datagram);
+                try {
+                    Message newMessage = receiveMessage(TIME_OUT);
+                    if (newMessage.getMessageType().value == MessageType.RESPONSE.value) {
+                        aquitmentReceived = true;
+                    } else {
+                        messageStock.add(newMessage);
+                    }
+                } catch (SocketTimeoutException ex) {
+                    destServer = this.getNextServer(destServer);
+                }
+            }
+
+            for (Message messageToProcess : messageStock) {
+                processMessage(messageToProcess);
+            }
+        } else {
+            socket.send(datagram);
+        }
+    }
+    
+    
+    /**
+     * Par défaut un envoi ce fait sans demande d'aquitement. 
+     * cf. sendMessage(Message, ServerDAO, boolean)
+     */
+    private void sendMessage(Message message, ServerDAO destServer) throws SocketException, IOException {
+        this.sendMessage(message, destServer, false);
+    }
+    
+    /**
+     * renvoie le serverDAO suivant (avec modulo) parmis les serveurs connus
+     * 
+     * @param server
+     * @return 
+     */
+    private ServerDAO getNextServer(ServerDAO server) {
+        //TODO
+        return servers[0];
     }
     
     public void stop() {
