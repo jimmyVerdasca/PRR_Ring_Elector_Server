@@ -36,66 +36,20 @@ import java.util.logging.Logger;
  * @author Jimmy Verdasca et Nathan Gonzales
  */
 public class RingElectorServer {
-    private final ServerDAO mySelf;
-    private ServerDAO nextServerAvailable;
-    private final ServerDAO[] servers;
-    private final int MAX_NB_SERVER = 4;
-    private final Thread electionManager;
+    private final Thread electionManagerThread;
+    private final Thread pingCoordinatorManager;
+    private final ElectionManager electionManager;
 
     public RingElectorServer(ServerDAO ownServer, ServerDAO[] servers) throws SocketException {
-        this.mySelf = ownServer;
-        this.servers = servers;
-        this.electionManager = new Thread(new ElectionManager(ownServer, servers));
+        this.electionManager = new ElectionManager(ownServer, servers);
+        this.electionManagerThread = new Thread(electionManager);
+        this.pingCoordinatorManager = new Thread(new PingCoordinatorManager(ownServer, electionManager));
     }
     
-    /**
-    * 3 types de messages sont possibles :
-    * 
-    * ELECTION + liste des candidats
-    * lorsqu'un nouveau serveur est disponible on fait un tour
-    * des serveurs pour savoir qui est disponible et qui devrait être l'élu.
-    * 
-    * RESPONSE
-    * Lorsqu'un serveur reçoit un message que ce soit ELECTION ou RESULT,
-    * Il répond par un RESPONSE sans paramètres après avoir transmis
-    * le message plus loin dans la chaine.
-    * Uniquement pour que le serveur le précédent dans l'anneau,
-    * sache que le message à bien été transmit.
-    * 
-    * RESULT + élu final
-    * lorsque le message ELECTION parvient jusqu'à un serveur qui se considère comme élu
-    * pour se considérer comme élu :
-    * 1) il doit se trouver dans la liste
-    * 2) il doit avoir le plus grande aptitude
-    * 3) en cas d'égalité avoir la plus petite adress IP
-    * Lorsque le message RESULT revient à l'élu, alors l'élection est
-    * terminé et l'unicité et la sélectivité sont respectés.
-    */
-    public void startElection() {
-        electionManager.start();
-    }
-    
-    
-    /*
-    public static void main (String[] args) throws UnknownHostException, IOException{
-        ServerDAO senderDAO = new ServerDAO(InetAddress.getByName("127.0.0.1"), 1099);
-        ServerDAO receiverDAO = new ServerDAO(InetAddress.getByName("127.0.0.1"), 1100);
-        ServerDAO[] servers = {senderDAO, receiverDAO};
-        RingElectorServer serverSender = new RingElectorServer(senderDAO, servers);
-        byte[] candidats = new byte[1];
-        candidats[0] = 3;
-        serverSender.sendMessage(new Message(candidats), receiverDAO);
-    }*/
-    /*
-    public static void main (String[] args) throws UnknownHostException, InterruptedException, IOException{
-        ServerDAO senderDAO = new ServerDAO(InetAddress.getByName("127.0.0.1"), 1099);
-        ServerDAO receiverDAO = new ServerDAO(InetAddress.getByName("127.0.0.1"), 1100);
-        ServerDAO[] servers = {senderDAO, receiverDAO};
-        RingElectorServer receiverServer = new RingElectorServer(receiverDAO, servers);
-        Thread.sleep(1000 * 10);
-        Message message = receiverServer.receiveMessage();
-        System.out.println(message.getMessageType().name());
+    public void start() {
+        electionManagerThread.start();
+        pingCoordinatorManager.start();
+        electionManager.startNewElection();
         
-    }*/
-    
+    }
 }

@@ -9,6 +9,8 @@ import java.net.SocketTimeoutException;
 import java.util.ArrayList;
 import java.util.List;
 import static com.mycompany.ring_elector_server.Phase.RESULT_PHASE;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  *
@@ -17,6 +19,7 @@ import static com.mycompany.ring_elector_server.Phase.RESULT_PHASE;
 public class ElectionManager implements Runnable {
 
     private final int TIME_OUT = 1000;
+    private long AVERAGE_ELECTION_TIME = 300;
     private final ServerDAO mySelf;
     private final ServerDAO[] servers;
     private final DatagramSocket socket;
@@ -25,6 +28,7 @@ public class ElectionManager implements Runnable {
     private boolean running;
     private int nextServerAvailable;
     private Phase phase;
+    private ServerDAO elected;
     
     public ElectionManager(ServerDAO ownServer, ServerDAO[] servers) throws SocketException {
         this.mySelf = ownServer;
@@ -59,6 +63,7 @@ public class ElectionManager implements Runnable {
     }
     
     public void initialize() {
+        elected = null;
         updateNextServer();
     }
     
@@ -74,74 +79,77 @@ public class ElectionManager implements Runnable {
         }
     }
     
-    private void processMessage(Message message) throws ProtocolException {
+    private void processMessage(Message message) throws ProtocolException, IOException {
         switch (message.getMessageType()) {
             case ELECTION:
-                List<ServerDAO> candidats = new ArrayList<>();
-                byte[] byteMessage = message.getMessage();
-                for (int i = 0; i < message.getLength(); i++) {
-                    candidats.add(servers[byteMessage[i + 1]]);
-                }
-                electionReceived(candidats);
+                ServerDAO candidat = servers[message.getCandidat()];
+                electionReceived(candidat);
                 break;
             case RESPONSE:
                 throw new ProtocolException("Received a RESPONSE without sending any ELECTION or RESULT");
             case RESULT:
-                ServerDAO elected = servers[message.getMessage()[1]];
+                ServerDAO elected = servers[message.getCandidat()];
                 resultReceived(elected);
                 break;
         }
     }
     
-    private void electionReceived(List<ServerDAO> candidats) {
-        if (candidats.contains(mySelf)) {
-            ServerDAO elected = calculateElected(candidats);
-            sendResultTo(elected);
+    private void electionReceived(ServerDAO candidat) throws IOException {
+        if (candidat == mySelf) {
+            elected = mySelf;
+            sendResult(elected);
             phase = RESULT_PHASE;
         } else {
-            candidats.add(mySelf);
-            sendElection(candidats);
+            ServerDAO favorit = calculateElected(candidat);
+            sendElection(favorit);
             phase = Phase.ELECTION_PHASE;
         }
     }
     
-    private ServerDAO calculateElected(List<ServerDAO> candidats) {
-        ServerDAO bestCandidat = candidats.get(0);
+    /**
+     * compare le candidat et mySelf pour déterminer
+     * lequel est le plus apte à être élu puis retourne le résultat.
+     * 
+     * @param candidat
+     * @return 
+     */
+    private ServerDAO calculateElected(ServerDAO candidat) {
         InetAddressComparator compInet = new InetAddressComparator();
-        
-        for (ServerDAO candidat : candidats) {
-            if(bestCandidat.getAptitude() > candidat.getAptitude() 
-                || (bestCandidat.getAptitude() == candidat.getAptitude() 
-                && compInet.compare(bestCandidat.getIpAdress(), candidat.getIpAdress()) < 0)) {
-                bestCandidat = candidat;
-            }
+        if(mySelf.getAptitude() > candidat.getAptitude() 
+            || (mySelf.getAptitude() == candidat.getAptitude() 
+            && compInet.compare(mySelf.getIpAdress(), candidat.getIpAdress()) < 0)) {
+            candidat = mySelf;
         }
-        return bestCandidat;
+        return candidat;
     }
     
-    private void resultReceived(ServerDAO elected) {
-        
+    private void resultReceived(ServerDAO elected) throws IOException {
+        if (phase == Phase.ELECTION_PHASE) {
+            this.elected = elected;
+            sendResult(elected);
+            phase = Phase.RESULT_PHASE;
+        } else if (phase == Phase.RESULT_PHASE && elected != this.elected) {
+            sendElection(mySelf);
+            phase = Phase.ELECTION_PHASE;
+        } else {
+            phase = Phase.ELECTED_PHASE;
+        }
     }
     
-    private boolean waitForResponse() {
-        return false;
+    public ServerDAO getElected() throws IllegalStateException {
+        if (phase == Phase.ELECTED_PHASE && elected != null) {
+            return elected;
+        } else {
+            throw new IllegalStateException("getElected should be call only when election is complete");
+        }
     }
     
-    private void responseNotReceived() {
-        
+    private void sendResult(ServerDAO elected) throws IOException {
+        sendMessage(new Message(MessageType.RESULT, elected), servers[nextServerAvailable]);
     }
     
-    
-    private void sendResultTo(ServerDAO elected) {
-        
-    }
-    
-    private void sendElection(List<ServerDAO> candidats) {
-        
-    }
-    
-    private void sendResponseTo(ServerDAO to) {
-        
+    private void sendElection(ServerDAO candidat) throws IOException {
+        sendMessage(new Message(MessageType.ELECTION, candidat), servers[nextServerAvailable], true);
     }
     
     /**
@@ -199,8 +207,7 @@ public class ElectionManager implements Runnable {
      * @return 
      */
     private ServerDAO getNextServer(ServerDAO server) {
-        //TODO
-        return servers[0];
+        return servers[(server.getId() + 1) % servers.length];
     }
     
     public void stop() {
@@ -227,6 +234,21 @@ public class ElectionManager implements Runnable {
     private void cleanBuffer() {
         for (int i = 0; i < buffer.length; i++) {
             buffer[i] = 0;
+        }
+    }
+
+    long getAverageElectionTime() {
+        // plutôt que de retourner un temps fixe, il serait possible de
+        // calculer une moyenne des temps des élections.
+        return AVERAGE_ELECTION_TIME;
+    }
+
+    void startNewElection() {
+        initialize();
+        try {
+            sendElection(mySelf);
+        } catch (IOException ex) {
+            Logger.getLogger(ElectionManager.class.getName()).log(Level.SEVERE, null, ex);
         }
     }
 

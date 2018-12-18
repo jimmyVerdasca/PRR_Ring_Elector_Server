@@ -17,7 +17,7 @@ public class Message {
      * Ne nécessite donc pas de paramètres
      */
     public Message() {
-        this(MessageType.RESPONSE, 1, (byte)0, (byte)0);
+        this(MessageType.RESPONSE, (byte)0, (byte)0);
     }
     
     /**
@@ -33,18 +33,20 @@ public class Message {
         /*
          * On se permet le cast car Il n'y aura que 4 id selon la donnée
          */
-        this(messageType, 3, (byte)candidat.getId(), candidat.getAptitude());
+        this(messageType, (byte)candidat.getId(), candidat.getAptitude());
     }
     
-    private Message(MessageType messageType, int length, byte idCandidat, byte aptitudeCandidat) {
-        this.length = length;
-        message = new byte[length];
-        message[0] = messageType.value;
-        
+    private Message(MessageType messageType, byte idCandidat, byte aptitudeCandidat) {
         if (messageType.value != MessageType.RESPONSE.value) {
+            this.length = 3;
+            message = new byte[length];
             message[1] = idCandidat;
             message[2] = aptitudeCandidat;
+        } else {
+            this.length = 1;
+            message = new byte[length];
         }
+        message[0] = messageType.value;
     }
     
     public static Message BuildMessage(byte[] buffer, ServerDAO[] servers) throws ProtocolException {
