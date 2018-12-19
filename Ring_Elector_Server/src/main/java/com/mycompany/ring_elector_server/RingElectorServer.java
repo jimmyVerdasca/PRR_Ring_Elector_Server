@@ -13,6 +13,8 @@ import java.net.SocketException;
  * 
  * L'élection est donc lancée au démarrage de ce serveur
  * 
+ * Le réseau est considéré comme infaillible pour ce labo
+ * 
  * @author Jimmy Verdasca et Nathan Gonzales
  */
 public class RingElectorServer {
