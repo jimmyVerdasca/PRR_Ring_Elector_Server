@@ -3,20 +3,15 @@ package com.mycompany.ring_elector_server;
 import java.net.SocketException;
 
 /**
- * classe servant de serveur,
- * implémentant l'algorithme d'élection en anneaux avec gestion des pannes.
+ * classe servant de serveur se connectant à d'autres serveurs et implémentant
+ * un système d'élection en anneaux et pinguant régulièrement l'élu
  * 
- * Le serveur élu ne fait que répondre qu'il est présent aux serveurs qui l'appel.
- * Tandis que les serveurs non-élus vont régulièrement demander
- * au serveur élu s'il est toujours en fonction.
+ * Elle lance deux threads
+ * Le premier implémente l'algorithme d'élection en anneaux avec panne
+ * Le second sert uniquement à pinguer régulièrement le serveur élu par
+ * le précédent algorithme
  * 
- * Lors de l'initialisation d'un tel serveur, le serveur lance une election.
- * Lors d'une panne, Si la machine en panne est l'élu,
- * alors le premier serveur qui se rend compte de la panne, lance une election.
- * Si une panne survient sur une machine non-élu, cela n'a pas d'impact,
- * jusqu'à son reboot qui lance une election.
- * 
- * Pour ce laboratoire, nous considérons que le réseau ne pause aucun soucit.
+ * L'élection est donc lancée au démarrage de ce serveur
  * 
  * @author Jimmy Verdasca et Nathan Gonzales
  */
@@ -25,12 +20,22 @@ public class RingElectorServer {
     private final Thread pingCoordinatorManager;
     private final ElectionManager electionManager;
 
+    /**
+     * constructeur
+     * 
+     * @param ownServer ServerDAO représentant notre instance
+     * @param servers table de correspondance id->ServerDAO devant contenir ServerDAO aussi
+     * @throws SocketException Si la création de notre propre socket échoue
+     */
     public RingElectorServer(ServerDAO ownServer, ServerDAO[] servers) throws SocketException {
         this.electionManager = new ElectionManager(ownServer, servers);
         this.electionManagerThread = new Thread(electionManager);
         this.pingCoordinatorManager = new Thread(new PingCoordinatorManager(ownServer, electionManager));
     }
     
+    /**
+     * lance les threads et démmarre une élection
+     */
     public void start() {
         electionManagerThread.start();
         pingCoordinatorManager.start();
