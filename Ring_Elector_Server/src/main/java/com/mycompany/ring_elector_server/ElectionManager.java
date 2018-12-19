@@ -177,6 +177,7 @@ public class ElectionManager implements Runnable {
             phase = Phase.ELECTION_PHASE;
         } else {
             phase = Phase.ELECTED_PHASE;
+            System.out.println("élection TERMINÉE");
         }
     }
     
@@ -236,9 +237,11 @@ public class ElectionManager implements Runnable {
             boolean aquitmentReceived = false;
             while (!aquitmentReceived) {
                 socket.send(datagram);
+                System.out.println("message avec aquittement " + message + " envoyé au serveur ip " + destServer.getIpAdress() + " port " + destServer.getPort());
                 try {
                     Message newMessage = receiveMessage(TIME_OUT);
                     if (newMessage.getMessageType().value == MessageType.RESPONSE.value) {
+                        System.out.println("aquittement reçu");
                         aquitmentReceived = true;
                     } else {
                         messageStock.add(newMessage);
@@ -253,6 +256,7 @@ public class ElectionManager implements Runnable {
             }
         } else {
             socket.send(datagram);
+                System.out.println("message sans aquittement " + message + " envoyé au serveur ip " + destServer.getIpAdress() + " port " + destServer.getPort());
         }
     }
     
@@ -301,6 +305,7 @@ public class ElectionManager implements Runnable {
         socket.setSoTimeout(timeOut);
         socket.receive(packet);
         Message message = Message.BuildMessage(buffer, servers);
+        System.out.println(message + " reçu  du serveur ip : " + packet.getAddress() + " port " + packet.getPort());
         cleanBuffer();
         return message;
     }
@@ -331,6 +336,7 @@ public class ElectionManager implements Runnable {
      * lance une nouvelle élection
      */
     void startNewElection() {
+        System.out.println("lancement d'une nouvelle élection");
         initialize();
         try {
             sendElection(mySelf);

@@ -94,6 +94,7 @@ public class PingCoordinatorManager implements Runnable {
             message[0] = Ping.SEND.value;
             DatagramPacket datagram = new DatagramPacket(message, 1, coordinator.getIpAdress(), PORT_PING + coordinator.getId());
             socket.send(datagram);
+            System.out.println("ping envoyé au serveur ip : " + coordinator.getIpAdress() + " port : " + PORT_PING + coordinator.getId());
         } catch (IOException ex) {
             Logger.getLogger(PingCoordinatorManager.class.getName()).log(Level.SEVERE, null, ex);
         }
@@ -101,7 +102,9 @@ public class PingCoordinatorManager implements Runnable {
         try {
             socket.setSoTimeout(1000);
             socket.receive(packet);
+            System.out.println("réponse du ping reçu du serveur ip : " + packet.getAddress() + " port : " + packet.getPort());
         } catch (SocketTimeoutException ex) {
+            System.out.println("réponse au ping NON RECU à temps");
             electionManager.startNewElection();
         } catch (SocketException ex) {
             Logger.getLogger(PingCoordinatorManager.class.getName()).log(Level.SEVERE, null, ex);
@@ -117,11 +120,15 @@ public class PingCoordinatorManager implements Runnable {
         DatagramPacket packet = new DatagramPacket(buffer, 1);
         try {
             socket.setSoTimeout(0);
+            System.out.println("attente de ping");
             socket.receive(packet);
+            System.out.println("ping reçu du serveur ip : " + packet.getAddress() + " port : " + packet.getPort());
             
             byte[] message = new byte[1];
             message[0] = Ping.RECEIVE.value;
             DatagramPacket datagram = new DatagramPacket(message, 1, packet.getAddress(), packet.getPort());
+            socket.send(datagram);
+            System.out.println("ping répondu au serveur ip : " + packet.getAddress() + " port : " + packet.getPort());
         } catch (IOException ex) {
             Logger.getLogger(PingCoordinatorManager.class.getName()).log(Level.SEVERE, null, ex);
         }

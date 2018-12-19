@@ -131,4 +131,14 @@ public class Message {
         }
         return message[1];
     }
+    
+    /**
+     * redéfinit l'impression avec println de cette class
+     * 
+     * @return un string représentant ce Message
+     */
+    @Override
+    public String toString() {
+        return " Type : " + getMessageType().name() + " idCandidat : " + getCandidat();
+    }
 }

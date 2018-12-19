@@ -1,6 +1,17 @@
 package com.mycompany.ring_elector_server;
 
+import java.io.IOException;
+import static java.lang.System.exit;
+import java.net.InetAddress;
 import java.net.SocketException;
+import java.net.UnknownHostException;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+import java.util.stream.Stream;
 
 /**
  * classe servant de serveur se connectant à d'autres serveurs et implémentant
@@ -21,6 +32,7 @@ public class RingElectorServer {
     private final Thread electionManagerThread;
     private final Thread pingCoordinatorManager;
     private final ElectionManager electionManager;
+    private final PingCoordinatorManager pingCoordinator;
 
     /**
      * constructeur
@@ -32,7 +44,8 @@ public class RingElectorServer {
     public RingElectorServer(ServerDAO ownServer, ServerDAO[] servers) throws SocketException {
         this.electionManager = new ElectionManager(ownServer, servers);
         this.electionManagerThread = new Thread(electionManager);
-        this.pingCoordinatorManager = new Thread(new PingCoordinatorManager(ownServer, electionManager));
+        this.pingCoordinator = new PingCoordinatorManager(ownServer, electionManager);
+        this.pingCoordinatorManager = new Thread(pingCoordinator);
     }
     
     /**
@@ -42,6 +55,41 @@ public class RingElectorServer {
         electionManagerThread.start();
         pingCoordinatorManager.start();
         electionManager.startNewElection();
+    }
+    
+    public void stop() {
+        electionManager.stop();
+        pingCoordinator.stop();
+    }
+    
+    /**
+     * main lançant le serveur et donc ces threads
+     * Lit le fichier structure.txt pour y récupérer les informations sur les serveurs existant
+     * 
+     * @param args ID du serveur qu'on lance
+     * @throws SocketException S'il est impossible de créer les sockets de ce serveur
+     */
+    public static void main (String[] args) throws SocketException{
+        int id = Integer.parseInt(args[0]);
         
+        List<ServerDAO> servers = new ArrayList<ServerDAO>();
+        
+        try (Stream<String> stream = Files.lines(Paths.get("structure.txt"))) {
+            stream.forEach(line -> {
+                try {
+                    String[] infosServer = line.split(" ");
+                    servers.add(new ServerDAO(InetAddress.getByName(infosServer[0]), Integer.parseInt(infosServer[1]), Integer.parseInt(infosServer[2])));
+                } catch (UnknownHostException ex) {
+                    Logger.getLogger(ServerDAO.class.getName()).log(Level.SEVERE, null, ex);
+                    exit(1);
+                }
+            });
+
+        } catch (IOException e) {
+                e.printStackTrace();
+        }
+        ServerDAO mySelf = servers.get(id);
+        RingElectorServer server = new RingElectorServer(mySelf, (ServerDAO[])servers.toArray());
+        server.start();
     }
 }
