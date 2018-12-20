@@ -91,8 +91,9 @@ public class ServerDAO {
      */
     @Override
     public boolean equals(Object obj) {
+        InetAddressComparator comp = new InetAddressComparator();
         return getClass().isInstance(obj) &&
-            ipAdress == ((ServerDAO)obj).ipAdress &&
+            comp.compare(ipAdress, ((ServerDAO)obj).ipAdress) == 0 &&
             id == ((ServerDAO)obj).id &&
             port == ((ServerDAO)obj).port;
     }

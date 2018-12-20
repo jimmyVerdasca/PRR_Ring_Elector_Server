@@ -9,9 +9,11 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
- * Runnable qui une fois lancé va pinguer le serveur que electionManager considère comme l'élu.
+ * Runnable qui une fois lancé va pinguer le serveur que electionManager considère 
+ * comme l'élu.
  * 
- * Si l'élu n'est pas encore choisit alors on attend quelques ms avant l'envoi du prochain ping
+ * Si l'élu n'est pas encore choisit alors on attend quelques ms avant l'envoi
+ * du prochain ping.
  * Si l'élu est cette instance même alors elle ne fait que répondre aux ping
  * 
  * Si un "client" ne reçoit aucune réponse du serveur après un certain temps,
@@ -37,7 +39,9 @@ public class PingCoordinatorManager implements Runnable {
      * permet de lancer une nouvelle élection
      * @throws SocketException Si on ne parvient pas à créer la socket
      */
-    public PingCoordinatorManager(ServerDAO ownServer, ElectionManager electionManager) throws SocketException {
+    public PingCoordinatorManager(ServerDAO ownServer,
+                                ElectionManager electionManager)
+                                throws SocketException {
         mySelf = ownServer;
         buffer = new byte[1];
         running = true;
@@ -56,21 +60,25 @@ public class PingCoordinatorManager implements Runnable {
         while(running) {
             try {
                 coordinator = electionManager.getElected();
+                System.out.println("NOUS AVONS UN ELUUUUU: " + coordinator.getId());
                 if (mySelf == coordinator) {
                     receivePingFromOthers();
                 } else {
                     pingCoordinator(coordinator);
                 }
             } catch (IllegalStateException ex) {
-                // une élection devrait être en cours, il ne sert a rien de pinger le serveur
-                // le mieux est donc de ne pas surcharger le traffic et d'attendre quelques ms que l'élection se termine.
-                
+                // Une élection devrait être en cours, il ne sert a rien de pinger
+                // le serveur
+                // Le mieux est donc de ne pas surcharger le traffic et d'attendre
+                // quelques ms que l'élection se termine.
+                System.out.println("Bah y'a pas d'élu...");
             }
             
             try {
                 Thread.sleep(electionManager.getAverageElectionTime());
             } catch (InterruptedException ex1) {
-                Logger.getLogger(PingCoordinatorManager.class.getName()).log(Level.SEVERE, null, ex1);
+                Logger.getLogger(PingCoordinatorManager.class.getName())
+                        .log(Level.SEVERE, null, ex1);
             }
         }
     }
@@ -92,24 +100,37 @@ public class PingCoordinatorManager implements Runnable {
         try {
             byte[] message = new byte[1];
             message[0] = Ping.SEND.value;
-            DatagramPacket datagram = new DatagramPacket(message, 1, coordinator.getIpAdress(), PORT_PING + coordinator.getId());
+            DatagramPacket datagram = new DatagramPacket(message,
+                                                    1,
+                                                    coordinator.getIpAdress(),
+                                                    PORT_PING + coordinator.getId());
             socket.send(datagram);
-            System.out.println("Ping envoyé au serveur ip : " + coordinator.getIpAdress() + " port : " + PORT_PING + coordinator.getId());
+            System.out.println("Ping envoyé au serveur ip : "
+                                + coordinator.getIpAdress()
+                                + " port : "
+                                + PORT_PING 
+                                + coordinator.getId());
         } catch (IOException ex) {
-            Logger.getLogger(PingCoordinatorManager.class.getName()).log(Level.SEVERE, null, ex);
+            Logger.getLogger(PingCoordinatorManager.class.getName())
+                    .log(Level.SEVERE, null, ex);
         }
         DatagramPacket packet = new DatagramPacket(buffer, 1);
         try {
             socket.setSoTimeout(1000);
             socket.receive(packet);
-            System.out.println("Réponse du ping reçu du serveur ip : " + packet.getAddress() + " port : " + packet.getPort());
+            System.out.println("Réponse du ping reçu du serveur ip : "
+                                + packet.getAddress()
+                                + " port : "
+                                + packet.getPort());
         } catch (SocketTimeoutException ex) {
             System.out.println("Réponse au ping NON RECU à temps");
             electionManager.startNewElection();
         } catch (SocketException ex) {
-            Logger.getLogger(PingCoordinatorManager.class.getName()).log(Level.SEVERE, null, ex);
+            Logger.getLogger(PingCoordinatorManager.class.getName())
+                    .log(Level.SEVERE, null, ex);
         } catch (IOException ex) {
-            Logger.getLogger(PingCoordinatorManager.class.getName()).log(Level.SEVERE, null, ex);
+            Logger.getLogger(PingCoordinatorManager.class.getName())
+                    .log(Level.SEVERE, null, ex);
         }
     }
 
@@ -122,15 +143,25 @@ public class PingCoordinatorManager implements Runnable {
             socket.setSoTimeout(0);
             System.out.println("Attente de PING");
             socket.receive(packet);
-            System.out.println("PING reçu du serveur ip : " + packet.getAddress() + " port : " + packet.getPort());
+            System.out.println("PING reçu du serveur ip : " 
+                                + packet.getAddress()
+                                + " port : "
+                                + packet.getPort());
             
             byte[] message = new byte[1];
             message[0] = Ping.RECEIVE.value;
-            DatagramPacket datagram = new DatagramPacket(message, 1, packet.getAddress(), packet.getPort());
+            DatagramPacket datagram = new DatagramPacket(message,
+                                                        1,
+                                                        packet.getAddress(),
+                                                        packet.getPort());
             socket.send(datagram);
-            System.out.println("PING répondu au serveur ip : " + packet.getAddress() + " port : " + packet.getPort());
+            System.out.println("PING répondu au serveur ip : "
+                                + packet.getAddress()
+                                + " port : "
+                                + packet.getPort());
         } catch (IOException ex) {
-            Logger.getLogger(PingCoordinatorManager.class.getName()).log(Level.SEVERE, null, ex);
+            Logger.getLogger(PingCoordinatorManager.class.getName())
+                    .log(Level.SEVERE, null, ex);
         }
     }
     

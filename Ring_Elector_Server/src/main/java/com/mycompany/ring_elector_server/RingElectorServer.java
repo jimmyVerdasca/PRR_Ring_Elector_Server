@@ -47,7 +47,8 @@ public class RingElectorServer {
             throws SocketException {
         this.electionManager = new ElectionManager(ownServer, servers);
         this.electionManagerThread = new Thread(electionManager);
-        this.pingCoordinator = new PingCoordinatorManager(ownServer, electionManager);
+        this.pingCoordinator = new PingCoordinatorManager(ownServer,
+                                                        electionManager);
         this.pingCoordinatorManager = new Thread(pingCoordinator);
     }
     

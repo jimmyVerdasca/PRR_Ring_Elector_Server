@@ -21,7 +21,7 @@ import java.util.logging.Logger;
  */
 public class ElectionManager implements Runnable {
 
-    private final int TIME_OUT = 1000;
+    private final int TIME_OUT = 2000;
     private final long AVERAGE_ELECTION_TIME = 300;
     private final ServerDAO mySelf;
     private final ServerDAO[] servers;
@@ -185,7 +185,7 @@ public class ElectionManager implements Runnable {
             phase = Phase.ELECTION_PHASE;
         } else {
             phase = Phase.ELECTED_PHASE;
-            System.out.println("élection TERMINÉE");
+            System.out.println("Élection TERMINÉE");
         }
     }
     
@@ -265,27 +265,23 @@ public class ElectionManager implements Runnable {
                         System.out.println("Aquittement reçu");
                         aquitmentReceived = true;
                     } else {
-                        processMessage(newMessage);
+                        messageStock.add(newMessage);
                     }
                 } catch (SocketTimeoutException ex) {
                     System.out.println("ERROR");
-                    System.out.println("SERVER BEFORE: " + destServer.getId());
                     destServer = this.getNextServer(destServer);
-                    System.out.println("SERVER AFTER: " + destServer.getId());
-                    System.out.println("MYSELF: " + mySelf.getId());
                     if(destServer == mySelf) {
                         // Si on est tout seul, on devient l'élu
                         phase = Phase.ELECTED_PHASE;
                         this.elected = mySelf;
-                        System.out.println("Élection TERMINÉE Myself: " + mySelf.getId());
                         aquitmentReceived = true;
                     }
                 }
             }
 
-//            for (Message messageToProcess : messageStock) {
-//                processMessage(messageToProcess);
-//            }
+            for (Message messageToProcess : messageStock) {
+                processMessage(messageToProcess);
+            }
         } else {
             socket.send(datagram);
             System.out.println("Message SANS aquittement " + message
@@ -347,12 +343,12 @@ public class ElectionManager implements Runnable {
         System.out.println(message + " reçu  du serveur ip : "
                             + packet.getAddress() + " port "
                             + packet.getPort());
-        cleanBuffer();
         if(message.getMessageType() != MessageType.RESPONSE) {
             System.out.println("SENDING RESPONSE");
             sendResponse(packet.getAddress(), packet.getPort());
             System.out.println("RESPONSE SENT");
         }
+        cleanBuffer();
         return message;
     }
     
@@ -379,7 +375,7 @@ public class ElectionManager implements Runnable {
     }
 
     /**
-     * lance une nouvelle élection
+     * Lance une nouvelle élection
      */
     void startNewElection() {
         System.out.println("Lancement d'une nouvelle élection");
@@ -392,12 +388,22 @@ public class ElectionManager implements Runnable {
         }
     }
 
+    /**
+     * Envoie le message RESPONSE
+     * @param address Adresse IP à qui il envoie le message
+     * @param port Port à qui il envoie le message
+     * @throws IOException 
+     */
     private void sendResponse(InetAddress address, int port) throws IOException {
         ServerDAO choice = null;
+        InetAddressComparator comp = new InetAddressComparator();
+        int i = 0;
         for (ServerDAO server : servers) {
-            if (server.getIpAdress() == address && server.getPort() == port) {
-                choice = new ServerDAO(address, port, port);
+            if (comp.compare(server.getIpAdress(), address) == 0
+                    && server.getPort() == port) {
+                choice = new ServerDAO(address, port, i);
             }
+            i++;
         }
         sendMessage(new Message(), choice);
     }

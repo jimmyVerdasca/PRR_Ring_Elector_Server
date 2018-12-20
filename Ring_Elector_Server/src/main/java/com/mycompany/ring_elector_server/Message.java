@@ -53,7 +53,8 @@ public class Message {
      * @param idCandidat actuel favori lors de l'envoi du message
      * @param aptitudeCandidat aptitude de l'actuel favori
      */
-    private Message(MessageType messageType, byte idCandidat, byte aptitudeCandidat) {
+    private Message(MessageType messageType, byte idCandidat, byte aptitudeCandidat)
+    {
         if (messageType.value != MessageType.RESPONSE.value) {
             this.length = 3;
             message = new byte[length];
@@ -77,7 +78,8 @@ public class Message {
      * @throws ProtocolException Si le buffer ne contient
      *         pas des valeurs correspondant au protocol
      */
-    public static Message BuildMessage(byte[] buffer, ServerDAO[] servers) throws ProtocolException {
+    public static Message BuildMessage(byte[] buffer, ServerDAO[] servers)
+            throws ProtocolException {
         Message message = null;
         if (buffer[0] == MessageType.RESPONSE.value) {
             message = new Message();
@@ -86,7 +88,8 @@ public class Message {
         } else if (buffer[0] == MessageType.ELECTION.value){
             message = new Message(MessageType.ELECTION, servers[buffer[1]]);
         } else {
-            throw new ProtocolException("Le type de message ne correspond à rien de connu : " + buffer[0]);
+            throw new ProtocolException("Le type de message ne correspond"
+                    + " à rien de connu : " + buffer[0]);
         }
         return message;
     }
@@ -127,7 +130,8 @@ public class Message {
      */
     byte getCandidat() throws IllegalStateException {
         if (getMessageType() == MessageType.RESPONSE) {
-            throw new IllegalStateException("mesage de type RESPONSE ne contient pas de candidat");
+            throw new IllegalStateException("Message de type RESPONSE ne"
+                    + " contient pas de candidat");
         }
         return message[1];
     }
@@ -139,6 +143,11 @@ public class Message {
      */
     @Override
     public String toString() {
-        return " Type : " + getMessageType().name() + " idCandidat : " + getCandidat();
+        if(getMessageType() == MessageType.RESPONSE) {
+            return " Type : " + getMessageType().name();
+        }else {
+            return " Type : " + getMessageType().name()
+                    + " idCandidat : " + getCandidat();
+        }
     }
 }
