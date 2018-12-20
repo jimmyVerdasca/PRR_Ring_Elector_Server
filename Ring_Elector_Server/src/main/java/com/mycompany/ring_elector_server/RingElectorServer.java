@@ -9,6 +9,7 @@ import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Scanner;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Stream;
@@ -38,10 +39,12 @@ public class RingElectorServer {
      * constructeur
      * 
      * @param ownServer ServerDAO représentant notre instance
-     * @param servers table de correspondance id->ServerDAO devant contenir ServerDAO aussi
+     * @param servers table de correspondance id->ServerDAO devant contenir 
+     * ServerDAO aussi
      * @throws SocketException Si la création de notre propre socket échoue
      */
-    public RingElectorServer(ServerDAO ownServer, ServerDAO[] servers) throws SocketException {
+    public RingElectorServer(ServerDAO ownServer, ServerDAO[] servers)
+            throws SocketException {
         this.electionManager = new ElectionManager(ownServer, servers);
         this.electionManagerThread = new Thread(electionManager);
         this.pingCoordinator = new PingCoordinatorManager(ownServer, electionManager);
@@ -64,32 +67,55 @@ public class RingElectorServer {
     
     /**
      * main lançant le serveur et donc ces threads
-     * Lit le fichier structure.txt pour y récupérer les informations sur les serveurs existant
+     * Lit le fichier structure.txt pour y récupérer les informations sur les
+     * serveurs existant
      * 
      * @param args ID du serveur qu'on lance
      * @throws SocketException S'il est impossible de créer les sockets de ce serveur
      */
     public static void main (String[] args) throws SocketException{
-        int id = Integer.parseInt(args[0]);
+        final String FILE_NAME = "./structure.txt";
         
-        List<ServerDAO> servers = new ArrayList<ServerDAO>();
+        Scanner in = new Scanner(System.in);
+        System.out.println("Select a from server 0 to 3: ");
+        int id = in.nextInt();
         
-        try (Stream<String> stream = Files.lines(Paths.get("structure.txt"))) {
-            stream.forEach(line -> {
+        ServerDAO servers[];
+        List<ServerDAO> sList = new ArrayList<>();
+        
+        try (Stream<String> stream = Files.lines(Paths.get(FILE_NAME))) {
+            long count = stream.count();
+            servers = new ServerDAO[(int) count];
+            
+            try (Stream<String> stream2 = Files.lines(Paths.get(FILE_NAME))) {
+            stream2.forEach(line -> {
                 try {
                     String[] infosServer = line.split(" ");
-                    servers.add(new ServerDAO(InetAddress.getByName(infosServer[0]), Integer.parseInt(infosServer[1]), Integer.parseInt(infosServer[2])));
+                    sList.add(new ServerDAO(InetAddress.getByName(infosServer[0]),
+                                        Integer.parseInt(infosServer[1]),
+                                        Integer.parseInt(infosServer[2])));
                 } catch (UnknownHostException ex) {
-                    Logger.getLogger(ServerDAO.class.getName()).log(Level.SEVERE, null, ex);
+                    Logger.getLogger(ServerDAO.class.getName())
+                          .log(Level.SEVERE, null, ex);
                     exit(1);
                 }
             });
+            
+            for (int cnt = 0; cnt < sList.size(); cnt++) {
+                servers[cnt] = sList.get(cnt);
+            }
+        
+            ServerDAO mySelf = servers[id];
+            RingElectorServer server = new RingElectorServer(mySelf, servers);
+            server.start();
 
+            } catch (IOException e) {
+                    e.printStackTrace();
+            }
         } catch (IOException e) {
                 e.printStackTrace();
         }
-        ServerDAO mySelf = servers.get(id);
-        RingElectorServer server = new RingElectorServer(mySelf, (ServerDAO[])servers.toArray());
-        server.start();
+        
+        
     }
 }
