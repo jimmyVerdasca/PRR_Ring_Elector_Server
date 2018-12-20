@@ -78,7 +78,7 @@ public class RingElectorServer {
         final String FILE_NAME = "./structure.txt";
         
         Scanner in = new Scanner(System.in);
-        System.out.println("Select a from server 0 to 3: ");
+        System.out.println("Select one of the identifiers of the servers: ");
         int id = in.nextInt();
         
         ServerDAO servers[];
